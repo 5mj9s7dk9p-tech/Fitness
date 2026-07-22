@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="TrainingHQ" />
+  <meta name="theme-color" content="#0a0a0c" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <title>Training HQ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0a0c; color: #f5f5f5; font-family: -apple-system, 'DM Sans', sans-serif; overscroll-behavior: none; }
+    input, select, textarea, button { font-family: inherit; }
+    /* Safe area padding for iPhone notch/home indicator */
+    #root { padding-bottom: env(safe-area-inset-bottom); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React + ReactDOM -->
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+
+  <!-- Recharts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.7.2/Recharts.min.js"></script>
+
+  <!-- Babel standalone for JSX transform -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+
+  <script type="text/babel" data-presets="react">
+const { useState, useEffect } = React;
+const { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } = Recharts;
+
+const MOVEMENTS = {
+  "Olympic Lifts": ["Snatch","Clean & Jerk","Power Snatch","Power Clean","Push Jerk","Split Jerk","Hang Snatch","Hang Clean"],
+  "Strength": ["Back Squat","Front Squat","Overhead Squat","Deadlift","Romanian Deadlift","Bench Press","Strict Press","Push Press","Sumo Deadlift"],
+  "Gymnastics": ["Pull-ups","Chest-to-Bar","Muscle-ups (Bar)","Muscle-ups (Ring)","Toes-to-Bar","Handstand Push-ups","Ring Dips","Pistols","Box Jumps"],
+  "Cardio/Conditioning": ["Row (meters)","Ski (meters)","Bike (calories)","Run (meters)","Double-Unders","Burpees","Wall Balls","Thrusters","KB Swings"],
+};
+
+const MUSCLE_MAP = {
+  "Snatch":           {Quads:20,Glutes:20,Hamstrings:10,"Lower Back":15,Traps:15,Shoulders:10,Core:10},
+  "Squat Snatch":     {Quads:20,Glutes:20,Hamstrings:10,"Lower Back":15,Traps:15,Shoulders:10,Core:10},
+  "Clean & Jerk":     {Quads:20,Glutes:20,Hamstrings:10,"Lower Back":15,Traps:15,Shoulders:10,Core:10},
+  "Squat Clean":      {Quads:25,Glutes:20,Hamstrings:10,"Lower Back":15,Traps:15,Shoulders:10,Core:5},
+  "Power Clean":      {Quads:15,Glutes:20,Hamstrings:15,"Lower Back":20,Traps:20,Shoulders:5,Core:5},
+  "Power Snatch":     {Quads:15,Glutes:15,Hamstrings:10,"Lower Back":20,Traps:20,Shoulders:15,Core:5},
+  "Hang Clean":       {Quads:10,Glutes:20,Hamstrings:20,"Lower Back":20,Traps:20,Shoulders:5,Core:5},
+  "Hang Snatch":      {Quads:10,Glutes:15,Hamstrings:20,"Lower Back":20,Traps:20,Shoulders:10,Core:5},
+  "Split Jerk":       {Quads:25,Glutes:15,Shoulders:30,Triceps:20,Core:10},
+  "Push Jerk":        {Quads:20,Glutes:10,Shoulders:35,Triceps:25,Core:10},
+  "Back Squat":       {Quads:40,Glutes:30,Hamstrings:15,"Lower Back":10,Core:5},
+  "Front Squat":      {Quads:50,Glutes:20,Hamstrings:10,Core:15,"Upper Back":5},
+  "Overhead Squat":   {Quads:35,Glutes:15,Hamstrings:10,Shoulders:20,Core:15,"Upper Back":5},
+  "Deadlift":         {"Lower Back":30,Glutes:25,Hamstrings:25,Traps:10,Quads:10},
+  "Sumo Deadlift":    {Glutes:35,Hamstrings:20,"Lower Back":20,Quads:15,Traps:10},
+  "Romanian Deadlift":{Hamstrings:45,Glutes:35,"Lower Back":20},
+  "Strict Press":     {Shoulders:50,Triceps:30,"Upper Back":10,Core:10},
+  "Push Press":       {Shoulders:40,Triceps:25,Quads:20,Core:10,"Upper Back":5},
+  "Bench Press":      {Chest:50,Triceps:30,Shoulders:20},
+  "Thruster":         {Quads:30,Glutes:20,Shoulders:25,Triceps:15,Core:10},
+  "Pull-ups":         {Lats:50,Biceps:25,Core:15,"Upper Back":10},
+  "Chest-to-Bar":     {Lats:50,Biceps:20,Core:20,"Upper Back":10},
+  "Muscle-ups (Bar)": {Lats:30,Biceps:15,Triceps:20,Core:20,Chest:15},
+  "Muscle-ups (Ring)":{Lats:25,Biceps:15,Triceps:20,Core:25,Chest:15},
+  "Toes-to-Bar":      {Core:60,Lats:20,Hamstrings:20},
+  "Handstand Push-ups":{Shoulders:50,Triceps:30,Core:20},
+  "Ring Dips":        {Triceps:35,Chest:30,Shoulders:20,Core:15},
+  "Pistols":          {Quads:50,Glutes:30,Core:20},
+  "Box Jumps":        {Quads:35,Glutes:35,Hamstrings:20,Core:10},
+  "Wall Balls":       {Quads:35,Glutes:20,Shoulders:25,Core:10,"Lower Back":10},
+  "KB Swings":        {Glutes:40,Hamstrings:30,"Lower Back":15,Core:10,Shoulders:5},
+  "Burpees":          {Quads:20,Chest:20,Shoulders:20,Core:20,Glutes:20},
+};
+
+const MUSCLE_COLORS = {
+  Quads:"#f59e0b",Glutes:"#ef4444",Hamstrings:"#f97316",
+  "Lower Back":"#8b5cf6","Upper Back":"#a78bfa",Traps:"#7c3aed",
+  Lats:"#3b82f6",Core:"#06b6d4",Shoulders:"#10b981",
+  Triceps:"#84cc16",Biceps:"#22c55e",Chest:"#ec4899",
+};
+
+const WOD_TYPES = ["For Time","AMRAP","EMOM","Strength","Hero WOD","Benchmark","Open","Custom"];
+const ENERGY_LABELS = ["Destroyed","Wrecked","Average","Solid","Energized"];
+const RPE_COLORS = ["#ef4444","#f97316","#eab308","#84cc16","#22c55e"];
+
+const STORAGE_KEY = "traininghq_workouts_v1";
+
+const SEED_WORKOUTS = [
+  {id:101,date:"2024-06-10",type:"Benchmark",name:"The CrossFit Total",notes:"1RM Back Squat + 1RM Shoulder Press + 1RM Deadlift. PR by 45 lbs vs. 875 on 04/28/2022.",result:"920 lbs total (PR)",rpe:9,energy:2,bodyweight:null,movements:[{name:"Back Squat",sets:[{reps:1,weight:355}]},{name:"Strict Press",sets:[{reps:1,weight:160}]},{name:"Deadlift",sets:[{reps:1,weight:405}]}]},
+  {id:102,date:"2024-02-09",type:"Benchmark",name:"Open 18.2A",notes:"1RM Clean & Jerk. Hit 255 lbs — power style. PR by 70 lbs vs. 185 on 08/26/2019.",result:"255 lbs (PR)",rpe:9,energy:3,bodyweight:null,movements:[{name:"Power Clean",sets:[{reps:1,weight:255}]}]},
+  {id:103,date:"2023-12-13",type:"Strength",name:"Snatch 1RM",notes:"1 Squat Snatch + 1 OHS complex. Hit 205 lbs snatch — PR by 20 lbs vs. 185.",result:"205 lbs (PR)",rpe:9,energy:3,bodyweight:null,movements:[{name:"Snatch",sets:[{reps:1,weight:205}]}]},
+  {id:104,date:"2023-09-19",type:"AMRAP",name:"Mary",notes:"20min AMRAP: 5 HSPU, 10 Pistols, 15 Pull-ups. PR by 13 rounds vs. 0+1 on 12/27/2022.",result:"13 + 5 (PR)",rpe:8,energy:3,bodyweight:null,movements:[]},
+  {id:107,date:"2022-08-29",type:"Benchmark",name:"Fran",notes:"21-15-9 Thrusters (95) + Pull-ups. PR by 1:22 vs. 5:29 on 07/14/2020.",result:"4:07 (PR)",rpe:10,energy:1,bodyweight:null,movements:[{name:"Thrusters",sets:[{reps:21,weight:95},{reps:15,weight:95},{reps:9,weight:95}]},{name:"Pull-ups",sets:[{reps:21},{reps:15},{reps:9}]}]},
+  {id:114,date:"2022-02-07",type:"Benchmark",name:"Nasty Girls",notes:"PR by 0:52 vs. 6:44 on 08/20/2021.",result:"5:52 (PR)",rpe:9,energy:2,bodyweight:null,movements:[]},
+];
+
+const INITIAL_PRS = {
+  "Snatch":         {weight:205, date:"2023-12-13",note:"1RM squat snatch"},
+  "Squat Snatch":   {weight:202, date:"2023-11-29",note:"1RM"},
+  "Power Snatch":   {weight:185, date:"2022-04-12",note:"1RM"},
+  "Clean & Jerk":   {weight:225, date:"2022-07-15",note:"1RM"},
+  "Squat Clean":    {weight:275, date:"2026-03-07",note:"1RM"},
+  "Power Clean":    {weight:265, date:"2024-05-10",note:"1RM"},
+  "Split Jerk":     {weight:225, date:"2023-08-30",note:"1RM"},
+  "Back Squat":     {weight:365, date:"2026-03-07",note:"1RM"},
+  "Front Squat":    {weight:330, date:"2026-03-07",note:"1RM"},
+  "Overhead Squat": {weight:245, date:"2023-11-06",note:"1RM"},
+  "Deadlift":       {weight:445, date:"2023-09-27",note:"1RM"},
+  "Sumo Deadlift":  {weight:445, date:"2023-11-22",note:"2RM"},
+  "Strict Press":   {weight:160, date:"2023-10-04",note:"1RM"},
+  "Push Press":     {weight:225, date:"2024-07-26",note:"1RM"},
+  "Thruster":       {weight:195, date:"2024-02-12",note:"2RM"},
+  "Fran":           {weight:null,date:"2022-08-29",note:"4:07"},
+  "CrossFit Total": {weight:920, date:"2024-06-10",note:"355 BS + 160 SP + 405 DL"},
+  "Mary":           {weight:null,date:"2023-09-19",note:"13 + 5 (20min)"},
+  "Nasty Girls":    {weight:null,date:"2022-02-07",note:"5:52"},
+};
+
+function loadWorkouts() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  return SEED_WORKOUTS;
+}
+
+function saveWorkouts(workouts) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(workouts)); } catch(e) {}
+}
+
+function getRpeColor(rpe) {
+  if (rpe <= 4) return "#22c55e";
+  if (rpe <= 6) return "#84cc16";
+  if (rpe <= 7) return "#eab308";
+  if (rpe <= 8) return "#f97316";
+  return "#ef4444";
+}
+
+function computeMuscleLoad(workouts) {
+  const totals = {};
+  workouts.forEach(w => {
+    w.movements.forEach(m => {
+      const map = MUSCLE_MAP[m.name];
+      if (!map) return;
+      const vol = m.sets.reduce((acc,s) => acc + (parseFloat(s.reps||0)*parseFloat(s.weight||1)),0);
+      Object.entries(map).forEach(([muscle,pct]) => {
+        totals[muscle] = (totals[muscle]||0) + (vol*pct/100);
+      });
+    });
+  });
+  return totals;
+}
+
+function WeekStrip({workouts}) {
+  const days = ["M","T","W","T","F","S","S"];
+  const today = new Date();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((today.getDay()+6)%7));
+  return (
+    <div style={{display:"flex",gap:6,alignItems:"center"}}>
+      {days.map((d,i) => {
+        const date = new Date(monday);
+        date.setDate(monday.getDate()+i);
+        const ds = date.toISOString().slice(0,10);
+        const worked = workouts.find(w => w.date===ds);
+        const isToday = ds===today.toISOString().slice(0,10);
+        return (
+          <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+            <span style={{fontSize:10,color:isToday?"#f59e0b":"#6b7280",fontFamily:"monospace",fontWeight:700,letterSpacing:1}}>{d}</span>
+            <div style={{width:34,height:34,borderRadius:8,background:worked?getRpeColor(worked.rpe):"#1c1c1e",border:isToday?"2px solid #f59e0b":"1px solid #2a2a2e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:worked?"#000":"#444",fontWeight:800}}>
+              {worked?worked.rpe:"·"}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function RPEGauge({value}) {
+  const pct=(value/10)*100;
+  const color=getRpeColor(value);
+  return (
+    <div style={{position:"relative",width:64,height:64}}>
+      <svg width="64" height="64" viewBox="0 0 64 64">
+        <circle cx="32" cy="32" r="24" fill="none" stroke="#1c1c1e" strokeWidth="5"/>
+        <circle cx="32" cy="32" r="24" fill="none" stroke={color} strokeWidth="5"
+          strokeDasharray={`${2*Math.PI*24*pct/100} ${2*Math.PI*24*(1-pct/100)}`}
+          strokeDashoffset={2*Math.PI*24*0.25} strokeLinecap="round"/>
+      </svg>
+      <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+        <span style={{fontSize:16,fontWeight:900,color,fontFamily:"monospace"}}>{value}</span>
+        <span style={{fontSize:7,color:"#6b7280",letterSpacing:1}}>RPE</span>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({label,value,sub,accent}) {
+  return (
+    <div style={{background:"#111113",border:"1px solid #222226",borderRadius:12,padding:"12px 14px",display:"flex",flexDirection:"column",gap:3,position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:accent||"#f59e0b",borderRadius:"12px 12px 0 0"}}/>
+      <span style={{fontSize:9,color:"#6b7280",letterSpacing:2,textTransform:"uppercase",fontFamily:"monospace"}}>{label}</span>
+      <span style={{fontSize:20,fontWeight:900,color:"#f5f5f5",lineHeight:1,letterSpacing:-0.5}}>{value}</span>
+      {sub && <span style={{fontSize:10,color:"#4b5563"}}>{sub}</span>}
+    </div>
+  );
+}
+
+function WorkoutCard({workout,onClick}) {
+  const totalVol = workout.movements.reduce((acc,m)=>acc+m.sets.reduce((s,set)=>s+(parseFloat(set.reps||0)*parseFloat(set.weight||0)),0),0);
+  return (
+    <div onClick={()=>onClick(workout)} style={{background:"#111113",border:"1px solid #222226",borderRadius:14,padding:"16px 18px",cursor:"pointer",display:"flex",flexDirection:"column",gap:10}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div>
+          <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:4}}>
+            <span style={{fontSize:9,fontWeight:800,letterSpacing:2,textTransform:"uppercase",background:"#1e1a12",color:"#f59e0b",padding:"2px 7px",borderRadius:4,fontFamily:"monospace"}}>{workout.type}</span>
+            <span style={{fontSize:11,color:"#4b5563",fontFamily:"monospace"}}>{new Date(workout.date+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}</span>
+          </div>
+          <h3 style={{fontSize:16,fontWeight:800,color:"#f5f5f5",margin:0,letterSpacing:-0.3}}>{workout.name}</h3>
+        </div>
+        <RPEGauge value={workout.rpe}/>
+      </div>
+      <p style={{fontSize:12,color:"#6b7280",margin:0,lineHeight:1.5}}>{workout.notes}</p>
+      <div style={{display:"flex",gap:16,paddingTop:8,borderTop:"1px solid #1c1c1e"}}>
+        <div style={{display:"flex",flexDirection:"column"}}>
+          <span style={{fontSize:9,color:"#4b5563",letterSpacing:1.5,textTransform:"uppercase",fontFamily:"monospace"}}>Result</span>
+          <span style={{fontSize:13,fontWeight:700,color:"#f59e0b"}}>{workout.result}</span>
+        </div>
+        {totalVol>0 && <div style={{display:"flex",flexDirection:"column"}}>
+          <span style={{fontSize:9,color:"#4b5563",letterSpacing:1.5,textTransform:"uppercase",fontFamily:"monospace"}}>Volume</span>
+          <span style={{fontSize:13,fontWeight:700,color:"#e5e7eb"}}>{totalVol.toLocaleString()} lbs</span>
+        </div>}
+        <div style={{display:"flex",flexDirection:"column"}}>
+          <span style={{fontSize:9,color:"#4b5563",letterSpacing:1.5,textTransform:"uppercase",fontFamily:"monospace"}}>Feel</span>
+          <span style={{fontSize:13,fontWeight:700,color:"#e5e7eb"}}>{ENERGY_LABELS[workout.energy]}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MovementSetRow({set,idx,onChange}) {
+  return (
+    <div style={{display:"flex",gap:8,alignItems:"center"}}>
+      <span style={{fontSize:11,color:"#4b5563",fontFamily:"monospace",width:16}}>{idx+1}</span>
+      <input type="number" placeholder="Reps" value={set.reps||""} onChange={e=>onChange({...set,reps:e.target.value})}
+        style={{width:64,padding:"6px 8px",background:"#1a1a1e",border:"1px solid #2a2a2e",borderRadius:6,color:"#f5f5f5",fontSize:14,fontFamily:"monospace"}}/>
+      <input type="number" placeholder="lbs" value={set.weight||""} onChange={e=>onChange({...set,weight:e.target.value})}
+        style={{width:72,padding:"6px 8px",background:"#1a1a1e",border:"1px solid #2a2a2e",borderRadius:6,color:"#f5f5f5",fontSize:14,fontFamily:"monospace"}}/>
+      <span style={{fontSize:11,color:"#4b5563"}}>lbs</span>
+    </div>
+  );
+}
+
+function LogForm({onSave,onCancel}) {
+  const [form,setForm]=useState({date:new Date().toISOString().slice(0,10),type:"For Time",name:"",notes:"",result:"",rpe:7,energy:2,bodyweight:"",movements:[]});
+  const [newMov,setNewMov]=useState("");
+  const addMovement=()=>{if(!newMov)return;setForm(f=>({...f,movements:[...f.movements,{name:newMov,sets:[{reps:"",weight:""}]}]}));setNewMov("");};
+  const updateSet=(mi,si,val)=>setForm(f=>({...f,movements:f.movements.map((m,i)=>i!==mi?m:{...m,sets:m.sets.map((s,j)=>j!==si?s:val)})}));
+  const addSet=(mi)=>setForm(f=>({...f,movements:f.movements.map((m,i)=>i!==mi?m:{...m,sets:[...m.sets,{reps:"",weight:""}]})}));
+  const removeMovement=(mi)=>setForm(f=>({...f,movements:f.movements.filter((_,i)=>i!==mi)}));
+  return (
+    <div style={{background:"#0d0d0f",border:"1px solid #2a2a2e",borderRadius:16,padding:20,display:"flex",flexDirection:"column",gap:18}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <h2 style={{fontSize:18,fontWeight:900,color:"#f5f5f5",margin:0}}>Log Workout</h2>
+        <button onClick={onCancel} style={{background:"none",border:"none",color:"#6b7280",fontSize:22,cursor:"pointer",lineHeight:1}}>✕</button>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        {[["date","Date","date"],["type","Type","select"]].map(([key,label,type])=>(
+          <div key={key} style={{display:"flex",flexDirection:"column",gap:5}}>
+            <label style={{fontSize:9,color:"#6b7280",letterSpacing:2,textTransform:"uppercase",fontFamily:"monospace"}}>{label}</label>
+            {type==="select"
+              ? <select value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} style={{padding:"9px 10px",background:"#1a1a1e",border:"1px solid #2a2a2e",borderRadius:8,color:"#f5f5f5",fontSize:13}}>
+                  {WOD_TYPES.map(t=><option key={t}>{t}</option>)}
+                </select>
+              : <input type={type} value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} style={{padding:"9px 10px",background:"#1a1a1e",border:"1px solid #2a2a2e",borderRadius:8,color:"#f5f5f5",fontSize:13}}/>
+            }
+          </div>
+        ))}
+        <div style={{gridColumn:"1/-1",display:"flex",flexDirection:"column",gap:5}}>
+          <label style={{fontSize:9,color:"#6b7280",letterSpacing:2,textTransform:"uppercase",fontFamily:"monospace"}}>Workout Name</label>
+          <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Fran, Tuesday WOD..."
+            style={{padding:"9px 10px",background:"#1a1a1e",border:"1px solid #2a2a2e",borderRadius:8,color:"#f5f5f5",fontSize:13}}/>
+        </div>
+        <div style={{gridColumn:"1/-1",display:"flex",flexDirection:"column",gap:5}}>
+          <label style={{fontSize:9,color:"#6b7280",letterSpacing:2,textTransform:"uppercase",fontFamily:"monospace"}}>Notes / WOD Description</label>
+          <textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} rows={3}
+            style={{padding:"9px 10px",background:"#1a1a1e",border:"1px solid #2a2a2e",borderRadius:8,color:"#f5f5f5",fontSize:13,resize:"vertical"}}/>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:5}}>
+          <label style={{fontSize:9,color:"#6b7280",letterSpacing:2,textTransform:"uppercase",fontFamily:"monospace"}}>Result / Score</label>
+          <input value={form.result} onChange={e=>setForm(f=>({...f,result:e.target.value}))} placeholder="4:32 / 9 rounds..."
+            style={{padding:"9px 10px",background:"#1a1a1e",border:"1px solid #2a2a2e",borderRadius:8,color:"#f5f5f5",fontSize:13}}/>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:5}}>
+          <label style={{fontSize:9,color:"#6b7280",letterSpacing:2,textTransform:"uppercase",fontFamily:"monospace"}}>Body Weight</label>
+          <input type="number" value={form.bodyweight} onChange={e=>setForm(f=>({...f,bodyweight:e.target.value}))} placeholder="lbs"
+            style={{padding:"9px 10px",background:"#1a1a1e",border:"1px solid #2a2a2e",borderRadius:8,color:"#f5f5f5",fontSize:13}}/>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <label style={{fontSize:9,color:"#6b7280",letterSpacing:2,textTransform:"uppercase",fontFamily:"monospace"}}>RPE — <span style={{color:getRpeColor(form.rpe)}}>{form.rpe}/10</span></label>
+          <input type="range" min={1} max={10} value={form.rpe} onChange={e=>setForm(f=>({...f,rpe:+e.target.value}))} style={{accentColor:getRpeColor(form.rpe),width:"100%"}}/>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#4b5563",fontFamily:"monospace"}}><span>Easy</span><span>Max</span></div>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <label style={{fontSize:9,color:"#6b7280",letterSpacing:2,textTransform:"uppercase",fontFamily:"monospace"}}>Feel — <span style={{color:"#f59e0b"}}>{ENERGY_LABELS[form.energy]}</span></label>
+          <div style={{display:"flex",gap:4}}>
+            {ENERGY_LABELS.map((l,i)=>(
+              <button key={i} onClick={()=>setForm(f=>({...f,energy:i}))}
+                style={{flex:1,padding:"8px 0",border:"1px solid",borderRadius:6,cursor:"pointer",fontSize:11,fontWeight:700,borderColor:form.energy===i?RPE_COLORS[i]:"#2a2a2e",background:form.energy===i?RPE_COLORS[i]+"22":"#1a1a1e",color:form.energy===i?RPE_COLORS[i]:"#4b5563"}}>
+                {i+1}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <label style={{fontSize:9,color:"#6b7280",letterSpacing:2,textTransform:"uppercase",fontFamily:"monospace"}}>Movements & Sets</label>
+        {form.movements.map((m,mi)=>(
+          <div key={mi} style={{background:"#111113",border:"1px solid #1e1e22",borderRadius:10,padding:14,display:"flex",flexDirection:"column",gap:10}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:13,fontWeight:700,color:"#f59e0b"}}>{m.name}</span>
+              <button onClick={()=>removeMovement(mi)} style={{background:"none",border:"none",color:"#4b5563",cursor:"pointer",fontSize:16}}>✕</button>
+            </div>
+            {m.sets.map((set,si)=><MovementSetRow key={si} set={set} idx={si} onChange={val=>updateSet(mi,si,val)}/>)}
+            <button onClick={()=>addSet(mi)} style={{background:"none",border:"1px dashed #2a2a2e",borderRadius:6,color:"#4b5563",padding:"6px",fontSize:11,cursor:"pointer"}}>+ Add Set</button>
+          </div>
+        ))}
+        <div style={{display:"flex",gap:8}}>
+          <select value={newMov} onChange={e=>setNewMov(e.target.value)}
+            style={{flex:1,padding:"9px 10px",background:"#1a1a1e",border:"1px solid #2a2a2e",borderRadius:8,color:newMov?"#f5f5f5":"#4b5563",fontSize:13}}>
+            <option value="">— Select movement —</option>
+            {Object.entries(MOVEMENTS).map(([cat,moves])=>(
+              <optgroup key={cat} label={cat}>{moves.map(m=><option key={m}>{m}</option>)}</optgroup>
+            ))}
+          </select>
+          <button onClick={addMovement} style={{padding:"9px 16px",background:"#f59e0b",border:"none",borderRadius:8,color:"#000",fontWeight:800,fontSize:13,cursor:"pointer"}}>Add</button>
+        </div>
+      </div>
+      <button onClick={()=>onSave({...form,id:Date.now()})} style={{padding:"14px",background:"#f59e0b",border:"none",borderRadius:10,color:"#000",fontWeight:900,fontSize:15,cursor:"pointer"}}>
+        Save Workout
+      </button>
+    </div>
+  );
+}
+
+function PRBoard({prs}) {
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      {Object.entries(prs).map(([mov,pr])=>(
+        <div key={mov} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",background:"#111113",border:"1px solid #1e1e22",borderRadius:10}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"#f5f5f5"}}>{mov}</div>
+            <div style={{fontSize:10,color:"#4b5563",fontFamily:"monospace"}}>
+              {new Date(pr.date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}
+              {pr.note&&pr.weight&&<span style={{marginLeft:5,color:"#374151"}}>· {pr.note}</span>}
+            </div>
+          </div>
+          <div style={{textAlign:"right"}}>
+            {pr.weight
+              ?<><span style={{fontSize:18,fontWeight:900,color:"#f59e0b",fontFamily:"monospace"}}>{pr.weight}</span><span style={{fontSize:11,color:"#6b7280",marginLeft:3}}>lbs</span></>
+              :<span style={{fontSize:15,fontWeight:800,color:"#f59e0b",fontFamily:"monospace"}}>{pr.note}</span>
+            }
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MuscularLoadView({workouts}) {
+  const [range,setRange]=useState("all");
+  const now=new Date();
+  const cutoff=new Date(now);
+  if(range==="7d") cutoff.setDate(now.getDate()-7);
+  else if(range==="30d") cutoff.setDate(now.getDate()-30);
+  else if(range==="90d") cutoff.setDate(now.getDate()-90);
+  else cutoff.setFullYear(2000);
+  const filtered=workouts.filter(w=>new Date(w.date+"T12:00:00")>=cutoff);
+  const totals=computeMuscleLoad(filtered);
+  const maxVal=Math.max(...Object.values(totals),1);
+  const barData=Object.entries(totals).sort((a,b)=>b[1]-a[1]).map(([muscle,val])=>({muscle,val:Math.round(val),pct:Math.round((val/maxVal)*100)}));
+  const radarData=Object.entries(totals).map(([muscle,val])=>({muscle,val:Math.round((val/maxVal)*100)}));
+  const totalVol=Object.values(totals).reduce((a,b)=>a+b,0);
+  const topMuscle=barData[0];
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"flex",gap:5}}>
+        {[["7d","7d"],["30d","30d"],["90d","90d"],["all","All"]].map(([v,label])=>(
+          <button key={v} onClick={()=>setRange(v)} style={{flex:1,padding:"8px 0",border:"1px solid",borderRadius:7,cursor:"pointer",fontSize:11,fontWeight:800,borderColor:range===v?"#f59e0b":"#2a2a2e",background:range===v?"#1e1a12":"#111113",color:range===v?"#f59e0b":"#4b5563"}}>{label}</button>
+        ))}
+      </div>
+      {totalVol===0?(
+        <div style={{textAlign:"center",padding:"40px 0",color:"#4b5563",fontSize:13}}>No tracked movement data.<br/>Log sets & reps to see load.</div>
+      ):(
+        <>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div style={{background:"#111113",border:"1px solid #1e1e22",borderRadius:12,padding:"12px 14px"}}>
+              <div style={{fontSize:9,color:"#6b7280",letterSpacing:2,textTransform:"uppercase",fontFamily:"monospace"}}>Most Loaded</div>
+              <div style={{fontSize:18,fontWeight:900,color:"#f59e0b",marginTop:2}}>{topMuscle?.muscle}</div>
+              <div style={{fontSize:10,color:"#4b5563"}}>{topMuscle?.val.toLocaleString()} lbs vol</div>
+            </div>
+            <div style={{background:"#111113",border:"1px solid #1e1e22",borderRadius:12,padding:"12px 14px"}}>
+              <div style={{fontSize:9,color:"#6b7280",letterSpacing:2,textTransform:"uppercase",fontFamily:"monospace"}}>Sessions</div>
+              <div style={{fontSize:18,fontWeight:900,color:"#f5f5f5",marginTop:2}}>{filtered.length}</div>
+              <div style={{fontSize:10,color:"#4b5563"}}>{barData.length} muscle groups</div>
+            </div>
+          </div>
+          <div style={{background:"#111113",border:"1px solid #1e1e22",borderRadius:14,padding:"14px 6px 6px"}}>
+            <div style={{fontSize:9,color:"#6b7280",letterSpacing:2,textTransform:"uppercase",fontFamily:"monospace",marginBottom:6,paddingLeft:8}}>Load Distribution</div>
+            <ResponsiveContainer width="100%" height={200}>
+              <RadarChart data={radarData} margin={{top:10,right:28,bottom:10,left:28}}>
+                <PolarGrid stroke="#1e1e22"/>
+                <PolarAngleAxis dataKey="muscle" tick={{fill:"#6b7280",fontSize:9,fontFamily:"monospace"}}/>
+                <Radar dataKey="val" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.15} strokeWidth={2}/>
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+          <div style={{background:"#111113",border:"1px solid #1e1e22",borderRadius:14,padding:14}}>
+            <div style={{fontSize:9,color:"#6b7280",letterSpacing:2,textTransform:"uppercase",fontFamily:"monospace",marginBottom:12}}>Volume by Muscle</div>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {barData.map(({muscle,val,pct})=>(
+                <div key={muscle} style={{display:"flex",flexDirection:"column",gap:3}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontSize:12,fontWeight:700,color:"#e5e7eb"}}>{muscle}</span>
+                    <span style={{fontSize:11,fontFamily:"monospace",color:MUSCLE_COLORS[muscle]||"#f59e0b"}}>{val.toLocaleString()} lbs</span>
+                  </div>
+                  <div style={{height:5,background:"#1a1a1e",borderRadius:3,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${pct}%`,background:MUSCLE_COLORS[muscle]||"#f59e0b",borderRadius:3}}/>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [workouts,setWorkouts]=useState(()=>loadWorkouts());
+  const [view,setView]=useState("log");
+  const [logging,setLogging]=useState(false);
+  const [detail,setDetail]=useState(null);
+
+  useEffect(()=>{ saveWorkouts(workouts); },[workouts]);
+
+  const today=new Date();
+  const monday=new Date(today);
+  monday.setDate(today.getDate()-((today.getDay()+6)%7));
+  const weekWorkouts=workouts.filter(w=>{const d=new Date(w.date+"T12:00:00");return d>=monday&&d<=today;});
+  const avgRpe=weekWorkouts.length?(weekWorkouts.reduce((a,b)=>a+b.rpe,0)/weekWorkouts.length).toFixed(1):"—";
+  const totalVol=workouts.slice(0,7).reduce((acc,w)=>acc+w.movements.reduce((a2,m)=>a2+m.sets.reduce((a3,s)=>a3+(parseFloat(s.reps||0)*parseFloat(s.weight||0)),0),0),0);
+  const handleSave=(workout)=>{const next=[workout,...workouts];setWorkouts(next);setLogging(false);};
+  const sorted=[...workouts].sort((a,b)=>b.date.localeCompare(a.date));
+
+  const NAV = [["log","Log"],["prs","PRs"],["load","Load"],["stats","Moves"]];
+
+  return (
+    <div style={{minHeight:"100vh",background:"#0a0a0c",color:"#f5f5f5",fontFamily:"-apple-system, 'DM Sans', sans-serif"}}>
+      <div style={{position:"sticky",top:0,zIndex:50,background:"rgba(10,10,12,0.95)",backdropFilter:"blur(12px)",borderBottom:"1px solid #1a1a1e",padding:"12px 16px",paddingTop:"calc(12px + env(safe-area-inset-top))",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:9,color:"#f59e0b",letterSpacing:3,textTransform:"uppercase",fontFamily:"monospace",fontWeight:700}}>CrossFit Log</div>
+          <div style={{fontSize:18,fontWeight:900,color:"#f5f5f5",letterSpacing:-0.5,lineHeight:1.1}}>TRAINING HQ</div>
+        </div>
+        <button onClick={()=>{setLogging(true);setDetail(null);}} style={{padding:"8px 14px",background:"#f59e0b",border:"none",borderRadius:8,color:"#000",fontWeight:800,fontSize:13,cursor:"pointer"}}>+ Log WOD</button>
+      </div>
+
+      <div style={{maxWidth:520,margin:"0 auto",padding:"14px 14px 100px"}}>
+        {!logging&&!detail&&(
+          <>
+            <div style={{background:"#111113",border:"1px solid #1e1e22",borderRadius:14,padding:"14px 16px",marginBottom:14}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                <span style={{fontSize:10,color:"#6b7280",letterSpacing:2,textTransform:"uppercase",fontFamily:"monospace"}}>This Week</span>
+                <span style={{fontSize:11,color:"#f59e0b",fontWeight:700}}>{weekWorkouts.length} sessions</span>
+              </div>
+              <WeekStrip workouts={workouts}/>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
+              <StatCard label="Avg RPE" value={avgRpe} sub="this week" accent={avgRpe!=="—"?getRpeColor(+avgRpe):"#f59e0b"}/>
+              <StatCard label="Sessions" value={weekWorkouts.length} sub="Mon–today" accent="#3b82f6"/>
+              <StatCard label="Volume" value={totalVol>0?`${(totalVol/1000).toFixed(0)}K`:"—"} sub="lbs (7d)" accent="#8b5cf6"/>
+            </div>
+          </>
+        )}
+
+        {!logging&&!detail&&(
+          <div style={{display:"flex",gap:5,marginBottom:16,background:"#111113",padding:4,borderRadius:10,border:"1px solid #1e1e22"}}>
+            {NAV.map(([v,label])=>(
+              <button key={v} onClick={()=>setView(v)} style={{flex:1,padding:"8px 4px",border:"none",borderRadius:7,cursor:"pointer",background:view===v?"#f59e0b":"transparent",color:view===v?"#000":"#6b7280",fontWeight:800,fontSize:11}}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {detail&&!logging&&(
+          <div>
+            <button onClick={()=>setDetail(null)} style={{background:"none",border:"none",color:"#f59e0b",cursor:"pointer",fontSize:13,fontWeight:700,marginBottom:14,padding:0}}>← Back</button>
+            <div style={{background:"#111113",border:"1px solid #222226",borderRadius:14,padding:18}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+                <div>
+                  <span style={{fontSize:9,fontWeight:800,letterSpacing:2,textTransform:"uppercase",background:"#1e1a12",color:"#f59e0b",padding:"2px 7px",borderRadius:4,fontFamily:"monospace"}}>{detail.type}</span>
+                  <h2 style={{fontSize:20,fontWeight:900,color:"#f5f5f5",margin:"8px 0 0",letterSpacing:-0.5}}>{detail.name}</h2>
+                  <div style={{fontSize:10,color:"#4b5563",fontFamily:"monospace",marginTop:2}}>{new Date(detail.date+"T12:00:00").toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</div>
+                </div>
+                <RPEGauge value={detail.rpe}/>
+              </div>
+              <p style={{fontSize:13,color:"#9ca3af",lineHeight:1.6,marginBottom:14}}>{detail.notes}</p>
+              <div style={{display:"flex",gap:20,paddingTop:12,borderTop:"1px solid #1c1c1e",marginBottom:16}}>
+                <div><div style={{fontSize:9,color:"#4b5563",letterSpacing:1.5,textTransform:"uppercase",fontFamily:"monospace"}}>Result</div><div style={{fontSize:17,fontWeight:800,color:"#f59e0b"}}>{detail.result}</div></div>
+                <div><div style={{fontSize:9,color:"#4b5563",letterSpacing:1.5,textTransform:"uppercase",fontFamily:"monospace"}}>Energy</div><div style={{fontSize:17,fontWeight:800,color:"#e5e7eb"}}>{ENERGY_LABELS[detail.energy]}</div></div>
+                {detail.bodyweight&&<div><div style={{fontSize:9,color:"#4b5563",letterSpacing:1.5,textTransform:"uppercase",fontFamily:"monospace"}}>BW</div><div style={{fontSize:17,fontWeight:800,color:"#e5e7eb"}}>{detail.bodyweight} lbs</div></div>}
+              </div>
+              {detail.movements.length>0&&(
+                <div>
+                  <div style={{fontSize:9,color:"#6b7280",letterSpacing:2,textTransform:"uppercase",fontFamily:"monospace",marginBottom:10}}>Sets & Reps</div>
+                  {detail.movements.map((m,mi)=>(
+                    <div key={mi} style={{marginBottom:12}}>
+                      <div style={{fontSize:13,fontWeight:700,color:"#f59e0b",marginBottom:5}}>{m.name}</div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                        {m.sets.map((s,si)=>(
+                          <div key={si} style={{background:"#1a1a1e",border:"1px solid #2a2a2e",borderRadius:6,padding:"4px 10px",fontFamily:"monospace",fontSize:12,color:"#e5e7eb"}}>
+                            {s.reps&&`${s.reps} reps`}{s.weight&&` @ ${s.weight}lbs`}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {logging&&<LogForm onSave={handleSave} onCancel={()=>setLogging(false)}/>}
+        {!logging&&!detail&&view==="log"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>{sorted.map(w=><WorkoutCard key={w.id} workout={w} onClick={setDetail}/>)}</div>}
+        {!logging&&!detail&&view==="prs"&&(
+          <div>
+            <div style={{fontSize:9,color:"#6b7280",letterSpacing:2,textTransform:"uppercase",fontFamily:"monospace",marginBottom:12}}>Personal Records</div>
+            <PRBoard prs={INITIAL_PRS}/>
+          </div>
+        )}
+        {!logging&&!detail&&view==="load"&&<MuscularLoadView workouts={workouts}/>}
+        {!logging&&!detail&&view==="stats"&&(
+          <div>
+            <div style={{fontSize:9,color:"#6b7280",letterSpacing:2,textTransform:"uppercase",fontFamily:"monospace",marginBottom:12}}>Movement Library</div>
+            {Object.entries(MOVEMENTS).map(([cat,moves])=>(
+              <div key={cat} style={{marginBottom:18}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#f59e0b",marginBottom:7,letterSpacing:1}}>{cat.toUpperCase()}</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                  {moves.map(m=>{
+                    const pr=INITIAL_PRS[m];
+                    return <div key={m} style={{padding:"5px 10px",background:"#111113",border:"1px solid #1e1e22",borderRadius:7,fontSize:12,color:pr?"#f5f5f5":"#4b5563",display:"flex",alignItems:"center",gap:5}}>
+                      {m}{pr&&<span style={{fontSize:9,color:"#f59e0b",fontFamily:"monospace",fontWeight:700}}>{pr.weight?pr.weight+"lb":pr.note}</span>}
+                    </div>;
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Bottom nav safe area spacer */}
+      <div style={{height:"env(safe-area-inset-bottom)"}}/>
+
+      <script>{`
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('/sw.js');
+        }
+      `}</script>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js');
+      });
+    }
+  </script>
+</body>
+</html>
