@@ -573,12 +573,6 @@ function App() {
 
       {/* Bottom nav safe area spacer */}
       <div style={{height:"env(safe-area-inset-bottom)"}}/>
-
-      <script>{`
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.register('/sw.js');
-        }
-      `}</script>
     </div>
   );
 }
